@@ -17,6 +17,8 @@ namespace Alex.Gui.Elements.Context3D
                 {
                     Entity.KnownPosition = value;
                     Entity.RenderLocation = value;
+
+                    Camera.LookAt = value + new Vector3(0f, (float) Entity.Height, 0f);
                 }                    
             }
         }
@@ -36,6 +38,8 @@ namespace Alex.Gui.Elements.Context3D
                 }
                 _entity = value;
                 Drawable = _entity?.ModelRenderer == null ? null : new EntityDrawable(_entity);
+                
+                Camera.LookAt = _entity.KnownPosition + new Vector3(0f, (float) value.Height, 0f);
             }
         }
 
@@ -43,8 +47,9 @@ namespace Alex.Gui.Elements.Context3D
         {
             Background = GuiTextures.PanelGeneric;
             Entity = entity;
-            Camera.CameraPositionOffset = new Vector3(0f, 1.62f, -2f);
-            Camera.TargetPositionOffset = new Vector3(0f, 1.8f, 0f);
+            //Camera.CameraPositionOffset = new Vector3(0f, 1.62f, -2f);
+            Camera.Position = new Vector3(0f, 1.62f, -2f);
+           // Camera.TargetPositionOffset = new Vector3(0f, 1.8f, 0f);
         }
 
         public void SetEntityRotation(float yaw, float pitch)

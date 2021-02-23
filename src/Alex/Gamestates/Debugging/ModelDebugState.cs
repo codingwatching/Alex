@@ -35,9 +35,9 @@ namespace Alex.Gamestates.Debugging
 {
 	public class ModelDebugState : GuiGameStateBase
 	{
-		private GuiStackContainer _wrap;
-		private GuiModelExplorerView _modelExplorerView;
-		private readonly GuiStackMenu _mainMenu;
+		private          GuiStackContainer   _wrap;
+		private          GuiContext3DElement _modelExplorerView;
+		private readonly GuiStackMenu        _mainMenu;
 
 		//  private FirstPersonCamera Camera { get; } = new FirstPersonCamera(16, Vector3.Zero, Vector3.Zero);
 
@@ -58,11 +58,11 @@ namespace Alex.Gamestates.Debugging
 
 			ModelExplorer = BlockModelExplorer;
 			
-			AddChild(_modelExplorerView = new GuiModelExplorerView(ModelExplorer, new Vector3(8f, 0f, 8f), new Vector3(0f, 0f, 0f))
+			AddChild(_modelExplorerView = new GuiContext3DElement(ModelExplorer)
 			{
 				Anchor = Alignment.Fill,
-				Background = Color.TransparentBlack,
-				BackgroundOverlay = new Color(Color.Black, 0.15f),
+				//Background = Color.TransparentBlack,
+				//BackgroundOverlay = new Color(Color.Black, 0.15f),
 
 				Margin = new Thickness(0),
 
@@ -97,13 +97,13 @@ namespace Alex.Gamestates.Debugging
 
 
 
-			_mainMenu.AddMenuItem("Skip",          () => { Task.Run(() => { ModelExplorer.Skip(); }); });
+		//	_mainMenu.AddMenuItem("Skip",          () => { Task.Run(() => { ModelExplorer.Skip(); }); });
 			_mainMenu.AddMenuItem("Next",          NextModel);
 			_mainMenu.AddMenuItem("Previous",      PrevModel);
 			_mainMenu.AddMenuItem("Switch Models", () =>
 			{
 				SwitchModelExplorers();
-				_modelExplorerView.ModelExplorer = ModelExplorer;
+				_modelExplorerView.Drawable = ModelExplorer;
 			});
 
 			//AddChild(_mainMenu);
@@ -186,6 +186,9 @@ namespace Alex.Gamestates.Debugging
 				_modelExplorerView.Width  = Screen.Width;
 				_modelExplorerView.Height = Screen.Height;
 			}
+
+			if (_modelExplorerView?.Camera != null) 
+				_modelExplorerView.Camera.Position = new Vector3(4f, 4f, 4f);
 
 			base.OnUpdate(gameTime);
 			
@@ -338,7 +341,7 @@ namespace Alex.Gamestates.Debugging
 						PooledTexture2D t = TextureUtils.BitmapToTexture2D(Alex.GraphicsDevice, bmp.Value);
 
 						renderer = new EntityModelRenderer(model, t);
-						renderer.Scale = 1f / 16f;
+						//renderer.Scale = 1f / 16f;
 					}
 				}
 			}
@@ -374,34 +377,6 @@ namespace Alex.Gamestates.Debugging
 			SetVertices();
 		}
 
-		public override void Skip()
-		{
-			return;
-			int start        = _index;
-			var currentState = _entityDefinitions[start];
-
-			for (int i = start; i < _entityDefinitions.Length; i++)
-			{
-				var state = _entityDefinitions[i];
-				/*if (!string.Equals(currentState.Name, state.Name))
-				{
-					_index = i;
-					SetVertices();
-					break;
-				}*/
-			}
-		}
-
-		//private PlayerLocation Location { get; set; } = new PlayerLocation(Vector3.Zero);
-
-		public override void SetLocation(PlayerLocation location)
-		{
-			//Location = location;
-
-			//  Location.Yaw = Location.HeadYaw = MathUtils.RadianToDegree(rotation.Y);
-			//  Location.Pitch = MathUtils.RadianToDegree(rotation.Z);
-		}
-
 		private int _previousIndex = -1;
 
 		public override string GetDebugInfo()
@@ -419,7 +394,7 @@ namespace Alex.Gamestates.Debugging
 		public override void UpdateContext3D(IUpdateArgs args, IGuiRenderer guiRenderer)
 		{
 			_rot += (float)args.GameTime.ElapsedGameTime.TotalSeconds;
-			_currentRenderer?.Update(args, new PlayerLocation(args.Camera.Position, 16f * _rot % 360f, 16f * _rot % 360f, 8f * _rot % 360f));
+			_currentRenderer?.Update(args, new PlayerLocation(Vector3.Zero, 0f, _rot * 45f, _rot * 25f));
 		}
 
 		/// <inheritdoc />
@@ -497,7 +472,7 @@ namespace Alex.Gamestates.Debugging
 			SetVertices();
 		}
 
-		public override void Skip()
+		/*public override void Skip()
 		{
 			int start        = _index;
 			var currentState = _blockStates[start];
@@ -512,15 +487,7 @@ namespace Alex.Gamestates.Debugging
 					break;
 				}
 			}
-		}
-
-		public override void SetLocation(PlayerLocation location)
-		{
-			// _rotation.Y = MathUtils.RadianToDegree(rotation.Y);
-			//   _rotation.Z = MathUtils.RadianToDegree(rotation.Z);
-			//  _rotation.X = MathUtils.RadianToDegree(rotation.X);
-			_location = location;
-		}
+		}*/
 
 		private float _rot = 0f;
 		/// <inheritdoc />
@@ -541,9 +508,12 @@ namespace Alex.Gamestates.Debugging
 		 _basicEffect.Projection = args.Camera.ProjectionMatrix;
 			 _basicEffect.View       = args.Camera.ViewMatrix;
 
-			 _basicEffect.World = Matrix.CreateScale(1f / 16f)
-			                                          * Matrix.CreateRotationY(MathUtils.ToRadians(18f * _rot % 360f))
-			                                          * Matrix.CreateRotationX(MathUtils.ToRadians(8f * _rot % 360f));
+			 _basicEffect.World = Matrix.Identity * Matrix.CreateTranslation(-offset) * Matrix.CreateScale(0.3f)
+			                      * Matrix.CreateFromYawPitchRoll(MathUtils.ToRadians(18f * _rot % 360f), 0f, 0f)
+			                      * Matrix.CreateTranslation(offset);
+
+			 //_basicEffect.World = Matrix.CreateRotationY(MathUtils.ToRadians((18f * _rot) % 360f))
+			 //                                         * Matrix.CreateRotationX(MathUtils.ToRadians((8f * _rot) % 360f));
 
 			var block = _blockStates[_index];
 
@@ -617,14 +587,9 @@ namespace Alex.Gamestates.Debugging
 	{
 		public abstract void   Next();
 		public abstract void   Previous();
-		public abstract void   Skip();
 		//public abstract void   Render(GraphicsContext context, RenderArgs renderArgs);
 	//	public abstract void   Update(UpdateArgs      args);
 		public abstract string GetDebugInfo();
-
-		public virtual void SetLocation(PlayerLocation location)
-		{
-		}
 
 		/// <inheritdoc />
 		public abstract void UpdateContext3D(IUpdateArgs args, IGuiRenderer guiRenderer);

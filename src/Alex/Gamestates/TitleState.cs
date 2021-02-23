@@ -13,6 +13,7 @@ using Alex.API.Services;
 using Alex.API.Utils;
 using Alex.Entities;
 using Alex.Gamestates.Common;
+using Alex.Gamestates.Debugging;
 using Alex.Gamestates.Login;
 using Alex.Gamestates.MainMenu;
 using Alex.Gamestates.Multiplayer;
@@ -422,6 +423,11 @@ namespace Alex.Gamestates
 					GoBack();
 				});
 			}
+
+			_mainMenu.AddMenuItem("Debug state", () =>
+			{
+				Alex.GameStateManager.SetActiveState(new ModelDebugState());
+			});
 		}
 
 		/// <inheritdoc />

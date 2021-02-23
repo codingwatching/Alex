@@ -9,7 +9,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Alex.Gui.Elements.Context3D
 {
-    public abstract class GuiContext3DElement : GuiElement
+    public class GuiContext3DElement : GuiElement
     {
         public GuiContext3DCamera Camera { get; protected set; }
 
@@ -17,7 +17,7 @@ namespace Alex.Gui.Elements.Context3D
 
         private Rectangle _previousBounds;
 
-        protected IGuiContext3DDrawable Drawable
+        public IGuiContext3DDrawable Drawable
         {
             get => _drawable;
             set
@@ -30,16 +30,18 @@ namespace Alex.Gui.Elements.Context3D
         private bool _canRender;
         private IGuiContext3DDrawable _drawable;
 
-        public GuiContext3DElement(IGuiContext3DDrawable drawable) : base()
+        public GuiContext3DElement(IGuiContext3DDrawable drawable) : this()
         {
             Drawable = drawable;
         }
 
         public GuiContext3DElement()
         {
-            Background = Color.Transparent;
+           // Background = Color.Transparent;
             TargetPosition = new PlayerLocation(Vector3.Zero);
             Camera = new GuiContext3DCamera(TargetPosition);
+            ClipToBounds = false;
+            Background = GuiTextures.PanelGeneric;
         }
 
 
@@ -61,9 +63,16 @@ namespace Alex.Gui.Elements.Context3D
                 //args.Graphics.Viewport = new Viewport(RenderBounds);
                 //graphics.End();
 
-
-                using (var context = graphics.BranchContext(BlendState.Opaque, DepthStencilState.Default,
-                    RasterizerState.CullClockwise, SamplerState.PointWrap))
+                var rast = new RasterizerState()
+                {
+                    CullMode = CullMode.CullClockwiseFace,
+                    FillMode = FillMode.Solid,
+                    DepthClipEnable = false,
+                    ScissorTestEnable = false
+                };
+                
+                using (var context = graphics.BranchContext(BlendState.AlphaBlend, DepthStencilState.Default,
+                    rast, SamplerState.PointWrap))
                 {
                     var bounds = RenderBounds;
 
@@ -77,8 +86,8 @@ namespace Alex.Gui.Elements.Context3D
                     newViewport.Y      = (int) p.Y;
                     newViewport.Width  = (int) (p2.X - p.X);
                     newViewport.Height = (int) (p2.Y - p.Y);
-                    newViewport.MaxDepth = 128f;
-                    newViewport.MinDepth = 0.01f;
+                    //newViewport.MaxDepth = 128f;
+                   // newViewport.MinDepth = 0.01f;
                     //newViewport.
 
                     Camera.Viewport = newViewport;
@@ -102,6 +111,7 @@ namespace Alex.Gui.Elements.Context3D
 
             if (_canRender)
             {
+                Camera.LookAt = TargetPosition;
                 var bounds = Screen.RenderBounds;
 
                 if (bounds != _previousBounds)
@@ -141,29 +151,9 @@ namespace Alex.Gui.Elements.Context3D
                 }
             }
 
-            private Vector3 _targetPositionOffset = new Vector3(0f, 0f, 0f);
-            private Vector3 _cameraPositionOffset = new Vector3(0f, 0f, 1f);
+           // private Vector3 _targetPositionOffset = new Vector3(0f, 0f, 0f);
+            //private Vector3 _cameraPositionOffset = new Vector3(0f, 0f, 1f);
             private Viewport _viewport;
-
-            public virtual Vector3 CameraPositionOffset
-            {
-                get => _cameraPositionOffset;
-                set
-                {
-                    _cameraPositionOffset = value;
-                    UpdateViewMatrix();
-                }
-            }
-
-            public virtual Vector3 TargetPositionOffset
-            {
-                get => _targetPositionOffset;
-                set
-                {
-                    _targetPositionOffset = value;
-                    UpdateViewMatrix();
-                }
-            }
 
             public GuiContext3DCamera(Vector3 basePosition) : base()
             {
@@ -175,16 +165,23 @@ namespace Alex.Gui.Elements.Context3D
                 SetRenderDistance(128);
             }
 
+            public Vector3 LookAt
+            {
+                get => Target;
+                set => Target = value;
+            }
+            
             protected override void UpdateViewMatrix()
             {
                 MCMatrix rotationMatrix = (MCMatrix.CreateRotationX(Rotation.X) *
                                            MCMatrix.CreateRotationY(Rotation.Y));
                 
-                Target = Position;
+               // Target = Position;
 
-                Direction = Vector3.Transform(Vector3.Forward, rotationMatrix);
+                Direction = Vector3.Transform(Vector3.Backward, rotationMatrix);
 
-                ViewMatrix = MCMatrix.CreateLookAt(Target + CameraPositionOffset, Target + TargetPositionOffset, Vector3.Up);
+                ViewMatrix = MCMatrix.CreateLookAt(Position, Vector3.Zero, Vector3.Up);
+                Frustum = new BoundingFrustum(ViewMatrix * ProjectionMatrix);
             }
 
             public override void UpdateProjectionMatrix()

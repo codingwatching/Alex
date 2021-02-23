@@ -127,8 +127,8 @@ namespace Alex.Graphics.Models.Entity
 						continue;
 					}
 
-					var inflation = (float) (cube.Inflate ?? bone.Inflate);
-					var mirror    = cube.Mirror ?? bone.Mirror;
+					var inflation = (float) (cube.Inflate.GetValueOrDefault(bone.Inflate));
+					var mirror    = cube.Mirror.GetValueOrDefault(bone.Mirror);// ?? bone.Mirror;
 
 					var      origin = cube.InflatedOrigin(inflation);
 					
@@ -234,8 +234,8 @@ namespace Alex.Graphics.Models.Entity
 
 			try
 			{
-				args.GraphicsDevice.BlendState = BlendState.Opaque;
-				args.GraphicsDevice.RasterizerState = RasterizerState;
+				//args.GraphicsDevice.BlendState = BlendState.Opaque;
+				//args.GraphicsDevice.RasterizerState = RasterizerState;
 
 				args.GraphicsDevice.SetVertexBuffer(VertexBuffer);
 
@@ -256,8 +256,8 @@ namespace Alex.Graphics.Models.Entity
 			}
 			finally
 			{
-				args.GraphicsDevice.RasterizerState = originalRaster;
-				args.GraphicsDevice.BlendState = blendState;
+			//	args.GraphicsDevice.RasterizerState = originalRaster;
+			//	args.GraphicsDevice.BlendState = blendState;
 			}
 		}
 
