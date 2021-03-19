@@ -118,6 +118,8 @@
     <EmbeddedResource Include="Resources\default_font.png" />
     <None Remove="Resources\nethergames.png" />
     <EmbeddedResource Include="Resources\nethergames.png" />
+    <None Remove="Resources\logo.png" />
+    <EmbeddedResource Include="Resources\logo.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -93,6 +93,8 @@ namespace Alex.Gamestates.InGame
             }
             
             _networkDebugHud = new NetworkDebugHud(NetworkProvider);
+            World.Ticker.RegisterTicked(_playingHud.Title);
+            
 		}
 
 		private void OnMinimapSettingChange(bool oldvalue, bool newvalue)
@@ -131,7 +133,6 @@ namespace Alex.Gamestates.InGame
 			if (RenderDebug)
 				Alex.GuiManager.AddScreen(_debugInfo);
 			
-			World.Ticker.RegisterTicked(_playingHud.Title);
 			_playingHud.Title.Ready();
 		}
 

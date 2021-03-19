@@ -78,20 +78,16 @@ namespace Alex.Net.Bedrock
 		public int ReliableMessageNumber = -1;
 		public int SplitPartId = 0;
 		public int OrderingIndex = -1;
-		public int ErrorCount { get; set; }
 
 		public bool Evicted { get; set; }
 
 		public ConnectionState State { get; set; } = ConnectionState.Unconnected;
 
 		public DateTime LastUpdatedTime { get; set; }
-		public bool WaitForAck { get; set; }
-		public int ResendCount { get; set; }
 
 		public SlidingWindow SlidingWindow { get; }
 
 		public long InactivityTimeout { get; }
-		public int ResendThreshold { get; }
 
 		public ConcurrentDictionary<int, SplitPartPacket[]> Splits { get; } = new ConcurrentDictionary<int, SplitPartPacket[]>();
 		private ConcurrentQueue<int> OutgoingAckQueue { get; } = new ConcurrentQueue<int>();
@@ -108,7 +104,6 @@ namespace Alex.Net.Bedrock
 			MtuSize = mtuSize;
 
 			InactivityTimeout = 30000;
-			ResendThreshold = 10;
 
 			_cancellationToken = new CancellationTokenSource();
 
@@ -182,7 +177,7 @@ namespace Alex.Net.Bedrock
 					if (!IsOutOfOrder)
 					{
 						IsOutOfOrder = true;
-						Log.Warn($"Datagram out of order. Expected {last + 1}, but was {current}.");
+						Log.Warn($"Channel out of order. Expected {last + 1}, but was {current}.");
 					}
 				}
 			}
@@ -245,7 +240,7 @@ namespace Alex.Net.Bedrock
 						}
 					}
 
-					if (!_orderingResetEvent.WaitOne(500)) //Keep the thread alive for longer.
+					if (!_orderingResetEvent.WaitOne(1500)) //Keep the thread alive for longer.
 						break;
 				}
 			}
@@ -636,19 +631,23 @@ namespace Alex.Net.Bedrock
 
 		private int _tickCounter;
 
-		public async Task SendTickAsync(global::Alex.Net.Bedrock.RaknetConnection connection)
+		public void SendTick(global::Alex.Net.Bedrock.RaknetConnection connection)
 		{
 			try
 			{
+				SendNackQueue();
+				SendAckQueue();
+
 				if (_tickCounter++ >= 5)
 				{
-					await Task.WhenAll(SendAckQueueAsync(), SendNackQueueAsync(), UpdateAsync(), SendQueueAsync(), connection.UpdateAsync(this));
+					Update();
+					
+					connection.Update(this);
+
 					_tickCounter = 0;
 				}
-				else
-				{
-					await Task.WhenAll(SendAckQueueAsync(), SendNackQueueAsync(), SendQueueAsync());
-				}
+				
+					SendQueue();
 			}
 			catch (Exception e)
 			{
@@ -660,13 +659,13 @@ namespace Alex.Net.Bedrock
 		//private object _updateSync = new object();
 		internal SemaphoreSlim UpdateSync = new SemaphoreSlim(1, 1);
 
-		private async Task UpdateAsync()
+		private void Update()
 		{
 			if (Evicted) return;
 
 			//if (MiNetServer.FastThreadPool == null) return;
 
-			if (!await UpdateSync.WaitAsync(0)) return;
+			if (!UpdateSync.Wait(0)) return;
 
 			try
 			{
@@ -721,7 +720,7 @@ namespace Alex.Net.Bedrock
 		}
 
 		//private ThreadSafeList<int> _nacked = new ThreadSafeList<int>();
-		private async Task SendNackQueueAsync()
+		private void SendNackQueue()
 		{
 			var           queue      = OutgoingNackQueue;
 			int           queueCount = queue.Count;
@@ -743,12 +742,12 @@ namespace Alex.Net.Bedrock
 			if (acks.Naks.Count > 0)
 			{
 				byte[] data = acks.Encode();
-				await _packetSender.SendDataAsync(data, EndPoint);
+				_packetSender.SendDataAsync(data, EndPoint);
 			}
 			acks.PutPool();
 		}
 		
-		private async Task SendAckQueueAsync()
+		private void SendAckQueue()
 		{
 			if (!SlidingWindow.ShouldSendAcks(CurrentTimeMillis()))
 				return;
@@ -774,7 +773,7 @@ namespace Alex.Net.Bedrock
 			{
 				byte[] data = acks.Encode();
 				
-				await _packetSender.SendDataAsync(data, EndPoint);
+				_packetSender.SendData(data, EndPoint);
 
 				this.SlidingWindow.OnSendAck();
 			}
@@ -785,22 +784,29 @@ namespace Alex.Net.Bedrock
 		private SemaphoreSlim _syncHack = new SemaphoreSlim(1, 1);
 
 		[SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
-		private async Task SendQueueAsync(int millisecondsWait = 0)
+		private void SendQueue(int millisecondsWait = 0)
 		{
 			if (_sendQueue.Count == 0) return;
 
 			// Extremely important that this will not allow more than one thread at a time.
 			// This methods handle ordering and potential encryption, hence order matters.
-			if (!(await _syncHack.WaitAsync(millisecondsWait))) return;
+			if (!(_syncHack.Wait(millisecondsWait))) return;
 
 			try
 			{
 				int transmissionBandwidth;
 				transmissionBandwidth = this.SlidingWindow.GetTransmissionBandwidth(this.UnackedBytes);
 
+				
 				var sendList = new List<Packet>();
 				//Queue<Packet> queue = _sendQueueNotConcurrent;
 				int length = _sendQueue.Count;
+
+				if (transmissionBandwidth > 0)
+				{
+					length = Math.Min(length, transmissionBandwidth / MtuSize);
+					//Log.Warn($"Bandwidth: {transmissionBandwidth} | Packets: {length}");
+				}
 				for (int i = 0; i < length; i++)
 				{
 					Packet packet;
@@ -821,6 +827,7 @@ namespace Alex.Net.Bedrock
 
 				if (sendList.Count == 0) return;
 
+				
 				List<Packet> prepareSend = CustomMessageHandler.PrepareSend(sendList);
 				var preppedSendList = new List<Packet>();
 				foreach (Packet packet in prepareSend)
@@ -834,12 +841,12 @@ namespace Alex.Net.Bedrock
 
 					if (reliability == Reliability.ReliableOrdered || reliability == Reliability.ReliableOrderedWithAckReceipt)
 						message.ReliabilityHeader.OrderingIndex = Interlocked.Increment(ref OrderingIndex);
-
+					
 					preppedSendList.Add(message);
 					//await _packetSender.SendPacketAsync(this, message);
 				}
 
-				await _packetSender.SendPacketAsync(this, preppedSendList);
+				_packetSender.SendPacket(this, preppedSendList);
 			}
 			catch (Exception e)
 			{
@@ -888,7 +895,7 @@ namespace Alex.Net.Bedrock
 			// Send with high priority, bypass queue
 			SendDirectPacket(DisconnectionNotification.CreateObject());
 
-			SendQueueAsync(500).Wait();
+			SendQueue(500);//.Wait();
 
 			_cancellationToken.Cancel();
 		//	_packetQueuedWaitEvent.Set();
@@ -940,7 +947,7 @@ namespace Alex.Net.Bedrock
 						//_nacked.Remove(i);
 						UnackedBytes -= datagram.Bytes.Length;
 						//CalculateRto(datagram);
-						SlidingWindow.OnAck(datagram.Timer.ElapsedMilliseconds, i, _lastDatagramSequenceNumber);
+						SlidingWindow.OnAck(datagram.Timer.ElapsedMilliseconds, datagram.Header.DatagramSequenceNumber.IntValue(), Interlocked.Read(ref _lastDatagramSequenceNumber));
 						datagram.PutPool();
 					}
 					else
@@ -950,9 +957,6 @@ namespace Alex.Net.Bedrock
 					}
 				}
 			}
-
-			ResendCount = 0;
-			WaitForAck = false;
 		}
 
 		internal void HandleNak(CustomNak nak)
@@ -987,13 +991,18 @@ namespace Alex.Net.Bedrock
 		public void Acknowledge(Datagram datagram)
 		{
 			var sequenceIndex = datagram.Header.DatagramSequenceNumber.IntValue();
+			
 			SlidingWindow.OnPacketReceived(CurrentTimeMillis());
+			
 			var previous = Interlocked.Read(ref _lastDatagramSequenceNumber);
 
 			if (previous < sequenceIndex)
 			{
 				Interlocked.Exchange(ref _lastDatagramSequenceNumber, sequenceIndex);
 			}
+			
+			if (sequenceIndex > previous)
+				OutgoingAckQueue.Enqueue(sequenceIndex);
 			
 			var missedDatagrams = sequenceIndex - previous - 1;
 
@@ -1007,8 +1016,6 @@ namespace Alex.Net.Bedrock
 					//}
 				}
 			}
-			
-			OutgoingAckQueue.Enqueue(sequenceIndex);
 			/*
 			var sequence = datagramSequenceNumber.IntValue();
 			OutgoingAckQueue.Enqueue(sequence);

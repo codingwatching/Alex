@@ -405,7 +405,7 @@ namespace Alex.Gui
 
 		private TextureSlice2D LoadTextureFromEmbeddedResource(GuiTextures guiTexture, byte[] resource)
 		{
-			_textureCache[guiTexture] = TextureUtils.ImageToTexture2D(_graphicsDevice, resource);
+			_textureCache[guiTexture] = TextureUtils.ImageToTexture2D( _graphicsDevice, resource);
 			return _textureCache[guiTexture];
 		}
 
