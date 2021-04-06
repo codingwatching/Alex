@@ -114,6 +114,8 @@ namespace Alex.Gamestates.Common
 			    Body.RemoveChild(item);
 		    }
 			_items.Clear();
+
+			Body.ScrollOffset = Vector2.Zero;
 	    }
     }
 }

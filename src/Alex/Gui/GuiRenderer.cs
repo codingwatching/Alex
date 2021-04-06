@@ -482,9 +482,32 @@ namespace Alex.Gui
 			return Vector2.Transform(screen, ScaledResolution.InverseTransformMatrix);
 		}
 
+		private static RasterizerState GetDefaultRasterizerState(bool scissorTestEnabled = false)
+		{
+			var rast = CopyRasterizerState(RasterizerState.CullNone);
+			rast.ScissorTestEnable = scissorTestEnabled;
+			return rast;
+		}
+		
+		private static RasterizerState CopyRasterizerState(RasterizerState rasterizerState)
+		{
+			return new RasterizerState()
+			{
+				CullMode = rasterizerState.CullMode,
+				DepthBias = rasterizerState.DepthBias,
+				DepthClipEnable = rasterizerState.DepthClipEnable,
+				FillMode = rasterizerState.FillMode,
+				MultiSampleAntiAlias = rasterizerState.MultiSampleAntiAlias,
+				Name = rasterizerState.Name,
+				ScissorTestEnable = rasterizerState.ScissorTestEnable,
+				SlopeScaleDepthBias = rasterizerState.SlopeScaleDepthBias,
+				Tag = rasterizerState.Tag
+			};
+		}
+		
 		public GraphicsContext CreateGuiSpriteBatchContext(GraphicsDevice graphics)
 		{
-			return GraphicsContext.CreateContext(graphics, BlendState.NonPremultiplied, DepthStencilState.None, RasterizerState.CullNone, SamplerState.PointClamp);
+			return GraphicsContext.CreateContext(graphics, BlendState.NonPremultiplied, DepthStencilState.None, GetDefaultRasterizerState(true), SamplerState.PointClamp);
 		}
 		
 		public IStyle[] ResolveStyles(Type elementType, string[] classNames)
