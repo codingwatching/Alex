@@ -187,7 +187,7 @@ namespace Alex
                         DeviceManager.PreferredBackBufferWidth = Window.ClientBounds.Width;
                         DeviceManager.PreferredBackBufferHeight = Window.ClientBounds.Height;
                     }
-
+                    
                     DeviceManager.ApplyChanges();
                 }
             };
